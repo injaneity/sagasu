@@ -1,4 +1,6 @@
-# `yyk`
+# `sfs`
+
+SMU FBS scraper
 
 ```console
 $ make start 
