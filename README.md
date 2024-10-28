@@ -3,6 +3,7 @@
 SMU FBS scraper
 
 ```console
+$ make
 $ make start 
 ```
 
