@@ -1,4 +1,8 @@
-# `sfs`
+# `sagasu`
+
+<p align="center">
+<img src="./asset/logo/icon_with_words.png" width=40% height=40%>
+</p>
 
 Telegram bot that finds available rooms in SMU.
 
@@ -8,7 +12,7 @@ Telegram bot that finds available rooms in SMU.
   
 If anything, the sluggish impression it gives off results from the overly convaluted system users must navigate to search for available rooms.
   
-`sfs` is a Telegram bot that scrapes SMU FBS per user-specified filters for available rooms, flagging any vacant facilities so users can quickly secure them on FBS.
+`sagasu` is a Telegram bot that scrapes SMU FBS per user-specified filters for available rooms, flagging any vacant facilities so users can quickly secure them on FBS.
 
 ![](./asset/screenshot/1.png)
 
@@ -16,7 +20,7 @@ If anything, the sluggish impression it gives off results from the overly conval
 
 Don't.  
   
-Access the telegram bot [`smu_fbs_scraper_bot`](https://t.me/smu_fbs_scraper_bot).
+Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
 ## Actually how build
 
