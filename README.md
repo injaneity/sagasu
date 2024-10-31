@@ -1,11 +1,16 @@
 # `sfs`
 
-SMU FBS scraper.
+Telegram bot that finds available rooms in SMU.
 
-```console
-$ make config
-$ make
-```
+## Rationale
+
+[SMU's Facility Booking System](https://fbs.intranet.smu.edu.sg/home) isn't an inherently slow website. Booking facilities in itself is quick.  
+  
+If anything, the sluggish impression it gives off results from the overly convaluted system users must navigate to search for available rooms.
+  
+`sfs` is a Telegram bot that scrapes SMU FBS per user-specified filters for available rooms, flagging any vacant facilities so users can quickly secure them on FBS.
+
+![](./asset/screenshot/1.png)
 
 ## How to build
 
