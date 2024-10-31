@@ -1,7 +1,7 @@
 # `sagasu`
 
 <p align="center">
-<img src="./asset/logo/icon_with_words.png" width=40% height=40%>
+<img src="./asset/logo/icon_with_words.png" width=50% height=50%>
 </p>
 
 Telegram bot that finds available rooms in SMU.
