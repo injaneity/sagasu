@@ -7,7 +7,9 @@ $ make
 $ make start 
 ```
 
-## Documentation
+## Usage
+
+### Secret
 
 `credentials.json` must follow the below format.
 
@@ -17,6 +19,8 @@ $ make start
     "password": "fill_your_placeholder_password"
 }
 ```
+
+### Scraping
 
 Scraping returns `scraped_log.json`, which contains the following.
 
