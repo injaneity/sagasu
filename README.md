@@ -4,6 +4,7 @@ SMU FBS scraper.
 
 ```console
 $ make config
+$ make
 ```
 
 ## Usage
