@@ -9,7 +9,13 @@ $ make
 
 ## Usage
 
-### Secret
+### Build it youself
+
+Don't. Access the telegram bot [here](t.me/smu_fbs_scraper_bot).
+
+### Actually build it yourself
+
+#### Secret
 
 `credentials.json` must follow the below format.
 
@@ -20,7 +26,7 @@ $ make
 }
 ```
 
-### Scraping
+#### Scraping
 
 Scraping returns `scraped_log.json`, which contains the following.
 
