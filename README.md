@@ -3,8 +3,7 @@
 SMU FBS scraper.
 
 ```console
-$ make
-$ make start 
+$ make config
 ```
 
 ## Usage
