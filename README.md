@@ -7,15 +7,15 @@ $ make config
 $ make
 ```
 
-## Usage
+## How to build
 
-### Build it youself
+Don't.  
+  
+Access the telegram bot [`smu_fbs_scraper_bot`](https://t.me/smu_fbs_scraper_bot).
 
-Don't. Access the telegram bot [here](t.me/smu_fbs_scraper_bot).
+## Actually how build
 
-### Actually build it yourself
-
-#### Secret
+### Secret
 
 `credentials.json` must follow the below format.
 
@@ -26,7 +26,7 @@ Don't. Access the telegram bot [here](t.me/smu_fbs_scraper_bot).
 }
 ```
 
-#### Scraping
+### Scraping
 
 Scraping returns `scraped_log.json`, which contains the following.
 
