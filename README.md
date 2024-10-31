@@ -1,18 +1,88 @@
 # `sfs`
 
-SMU FBS scraper
+SMU FBS scraper.
 
 ```console
 $ make
 $ make start 
 ```
 
-`credentials.json` should follow the below format
+## Documentation
+
+`credentials.json` must follow the below format.
 
 ```json
 {
-    "username": "your_placeholder_username",
-    "password": "your_placeholder_password"
+    "username": "fill_your_placeholder_username",
+    "password": "fill_your_placeholder_password"
+}
+```
+
+Scraping returns `scraped_log.json`, which contains the following.
+
+* Scraping metadata
+
+```json
+"metrics": {
+    "scraping_date": "current_date"
+},
+```
+
+* Scraping configuration
+
+```json
+"config": {
+    "date": "specified_date",
+    "start_time": "specified_start_time",
+    "end_time": "specified_end_time",
+    "duration": 0, /* any integer value */
+    "building_names": [
+        "specified_schools"
+    ],
+    "floors": [
+        "specified_floors"
+    ],
+    "facility_types": [
+        "specified_facility_types"
+    ],
+    "room_capacity": 0, /* any integer value */
+    "equipment": [
+        "specified_equipment"
+    ]
+},
+```
+
+* Scraped results
+
+```json
+"result": {
+    "room_1": [
+        {
+            "timeslot": "timeslot_1",
+            "available": false,
+            "status": "Not available",
+            "details": null
+        },
+        {
+            "timeslot": "timeslot_2",
+            "available": false,
+            "status": "Booked",
+            "details": {
+                "Booking Time": "...",
+                "Booking Status": "...",
+                "Booking Reference Number": "...",
+                "Booked for User Name": "...",
+                "Booked for User Org Unit": "",
+                "Booked for User Email Address": "...",
+                "Use Type": "...",
+                "Purpose of Booking": "..."
+            }
+        }
+    ],
+    "room_2": [
+        /* ... */
+    ],
+    /* ... */
 }
 ```
 
