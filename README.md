@@ -1,3 +1,5 @@
+![](https://img.shields.io/badge/sagasu_1.0-build-orange)
+  
 # `sagasu`
 
 <p align="center">
