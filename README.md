@@ -125,9 +125,7 @@ Scraping returns `scraped_log.json`, which contains the following.
                     <sub><b>SpringOrca69</b></sub>
                 </a>
             </td>
-        </tr>
-        <tr>
-            <td align="center">
+	    <td align="center">
                 <a href="https://github.com/injaneity">
                     <img src="https://avatars.githubusercontent.com/u/44902825?v=4" width="100;" alt="injaneity"/>
                     <br/>
