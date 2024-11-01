@@ -1,5 +1,11 @@
 ![](https://img.shields.io/badge/sagasu_1.0-build-orange)
-  
+
+>[!IMPORTANT]  
+> Features are being added per recent user feedback.  
+> `sagasu` will be deployed again afterward.
+>  
+> *\~ Gabriel*
+
 # `sagasu`
 
 <p align="center">
