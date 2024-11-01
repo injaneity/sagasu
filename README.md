@@ -32,29 +32,50 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
 ## Actually how to build
 
-### Secret
+1. Setup Virtual Environment
+`python -m venv venv` (in root directory)
 
-Specify your credentials within a `.env` file that follows the below format.
+`source venv/bin/activate` (for Unix-based systems)
+`.\venv\Scripts\activate` (for Windows)
 
-```env
-USERNAME="fill_your_placeholder_username"
-PASSWORD="fill_your_placeholder_password"
-```
+2. Install Dependencies
+`pip install -r requirements.txt`
 
 ### Scraping
 
-Scraping returns `scraped_log.json`, which contains the following.
+1. Run scraper.py in scraper_async
+`make start`
 
-* Scraping metadata
-
+2. Send a POST request to `localhost:8000/scrape`
+Your payload should look like this
 ```json
-"metrics": {
-    "scraping_date": "current_date"
-},
+{
+    "credentials": {
+        "username": "[INSERT-SMU-USERNAME]",
+        "password": "[INSERT-SMU-PASSWORD]"
+    },
+    "date_raw": "4 November 2024",
+    "duration_hours": 2.5,
+    "start_time": "11:00",
+    "building_names": [
+        "School of Accountancy",
+        "School of Computing & Information Systems 1"
+    ],
+    "floors": [
+        "Basement 1",
+        "Level 1",
+        "Level 2",
+        "Level 4"
+    ],
+    "facility_types": [
+        "Meeting Pod",
+        "Group Study Room"
+    ],
+    "equipment": []
+}
 ```
 
-* Scraping configuration
-
+3. api.py returns `scraped_log.json`:
 ```json
 "config": {
     "date": "specified_date",
