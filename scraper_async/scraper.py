@@ -7,7 +7,6 @@ from dateutil.parser import parse
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
-# Helper Functions
 def generate_30_min_intervals():
     intervals = []
     start = datetime.strptime("00:00", "%H:%M")
@@ -69,12 +68,21 @@ def calculate_end_time(valid_time_array, start_time, duration_hrs):
     closest_time = min(valid_time_array, key=lambda t: abs((int(t.split(":")[0]) * 60 + int(t.split(":")[1])) - (end_hours * 60 + end_minutes)))
     return [closest_time, end_time]
 
+from dateutil.parser import parse
+from datetime import datetime
+
 def format_date(date_input):
     try:
         date_obj = parse(date_input)
+        today = datetime.now().date()
+        if date_obj.date() < today:
+            raise ValueError(f"The input date {date_obj.strftime('%d-%b-%Y')} is in the past.")
+        
         return date_obj.strftime("%d-%b-%Y")
-    except ValueError:
-        return "Invalid date format"
+    
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid date input: {e}")
+
 
 def split_bookings_by_day(bookings):
     days = []
