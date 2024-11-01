@@ -30,17 +30,15 @@ Don't.
   
 Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
-## Actually how build
+## Actually how to build
 
 ### Secret
 
-`credentials.json` must follow the below format.
+Specify your credentials within a `.env` file that follows the below format.
 
-```json
-{
-    "username": "fill_your_placeholder_username",
-    "password": "fill_your_placeholder_password"
-}
+```env
+USERNAME="fill_your_placeholder_username"
+PASSWORD="fill_your_placeholder_password"
 ```
 
 ### Scraping
