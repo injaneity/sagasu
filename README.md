@@ -121,10 +121,19 @@ Scraping returns `scraped_log.json`, which contains the following.
             <td align="center">
                 <a href="https://github.com/SpringOrca69">
                     <img src="https://avatars.githubusercontent.com/u/159885540?v=4" width="100;" alt="SpringOrca69"/>
-                    <br />
+                    <br/>
                     <sub><b>SpringOrca69</b></sub>
                 </a>
             </td>
-	</tr>
+        </tr>
+        <tr>
+            <td align="center">
+                <a href="https://github.com/injaneity">
+                    <img src="https://avatars.githubusercontent.com/u/44902825?v=4" width="100;" alt="injaneity"/>
+                    <br/>
+                    <sub><b>injaneity</b></sub>
+                </a>
+            </td>
+        </tr>
 	<tbody>
 </table>
