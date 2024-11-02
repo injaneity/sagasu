@@ -46,8 +46,17 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 1. Run scraper.py in scraper_async
 `make start`
 
-2. Send a POST request to `localhost:8000/scrape`
-Your payload should look like this
+2. Encrypt your credentials through `localhost:8000/encrypt_credentials`
+This is purely to mock the behaviour of the frontend encryption, and will be removed in production.
+```json
+"credentials": {
+    "username": "[INSERT-SMU-USERNAME]",
+    "password": "[INSERT-SMU-PASSWORD]"
+}
+```
+
+3. Send a POST request to `localhost:8000/scrape`
+Pass your encrypted details into the credentials of the scraper
 ```json
 {
     "credentials": {
