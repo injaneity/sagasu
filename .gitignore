@@ -6,3 +6,5 @@ __pycache__
 booking_log/*.json
 .env
 venv/
+/scraper_async/.env
+/scraper_async/*.pem
