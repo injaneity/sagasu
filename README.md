@@ -33,21 +33,43 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 ## Actually how to build
 
 1. Setup Virtual Environment
-`python -m venv venv` (in root directory)
 
-`source venv/bin/activate` (for Unix-based systems)
-`.\venv\Scripts\activate` (for Windows)
+```python -m venv venv``` (in root directory)
+
+```source venv/bin/activate``` (for Unix-based systems)
+```.\venv\Scripts\activate``` (for Windows)
 
 2. Install Dependencies
-`pip install -r requirements.txt`
 
-### Scraping
+```pip install -r requirements.txt```
 
-1. Run scraper.py in scraper_async
-`make start`
+3. Build & Test scraper_async
 
-2. Encrypt your credentials through `localhost:8000/encrypt_credentials`
+```cd scraper_async```
+
+```docker build --platform linux/amd64 -t <username>/<docker-repo-name> .```
+
+```docker run --platform=linux/amd64 -p 80:8000 -d injaneity/sagasu-scraper```
+
+4. Clean Up scraper_async
+
+```docker ps```
+
+```docker kill <prefix>```
+
+```docker remove <prefix>```
+
+### Local Testing
+
+1. (If not running on Docker) Run scraper.py in scraper_async
+
+````make start```
+
+2. Encrypt your credentials 
+
+```localhost:8000/encrypt_credentials```
 This is purely to mock the behaviour of the frontend encryption, and will be removed in production.
+
 ```json
 "credentials": {
     "username": "[INSERT-SMU-USERNAME]",
@@ -55,8 +77,11 @@ This is purely to mock the behaviour of the frontend encryption, and will be rem
 }
 ```
 
-3. Send a POST request to `localhost:8000/scrape`
+3. Send a POST request
+
+```localhost:8000/scrape```
 Pass your encrypted details into the credentials of the scraper
+
 ```json
 {
     "credentials": {
