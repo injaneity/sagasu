@@ -164,7 +164,7 @@ async def scrape_smu_fbs(request, constants):
     
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False, slow_mo=1000)
+            browser = await p.chromium.launch(headless=True, slow_mo=1000)
             # browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
 
