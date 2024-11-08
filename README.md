@@ -63,7 +63,7 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
 1. (If not running on Docker) Run scraper.py in scraper_async
 
-````make start```
+```make start```
 
 2. Encrypt your credentials 
 
