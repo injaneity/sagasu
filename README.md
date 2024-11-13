@@ -32,9 +32,11 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
 ## Actually how to build
 
+```cd scraper_async```
+
 1. Setup Virtual Environment
 
-```python -m venv venv``` (in root directory)
+```python3.12 -m venv venv``` (in root directory)
 
 ```source venv/bin/activate``` (for Unix-based systems)
 ```.\venv\Scripts\activate``` (for Windows)
@@ -43,9 +45,9 @@ Access the telegram bot [`sagasu_bot`](https://t.me/sagasu_bot).
 
 ```pip install -r requirements.txt```
 
-3. Build & Test scraper_async
+```playwright install```
 
-```cd scraper_async```
+3. Build & Test scraper_async
 
 ```docker build --platform linux/amd64 -t <username>/<docker-repo-name> .```
 
