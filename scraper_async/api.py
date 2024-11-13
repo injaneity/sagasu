@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import yaml
 from security import encrypt_data_rsa, decrypt_data_rsa, load_public_key, load_private_key
 from cryptography.hazmat.primitives import serialization
+from exceptions import FrameNotFoundException
 
 app = FastAPI()
 
@@ -76,6 +77,8 @@ async def scrape_endpoint(request: ScrapeRequest):
             
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"Decryption failed: {str(e)}. Ensure credentials are encrypted and in hexadecimal format.")
+        except FrameNotFoundException as fnf_error:
+            raise HTTPException(status_code=404, detail=str(fnf_error))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Unexpected error during decryption: {str(e)}.")
         
