@@ -1,11 +1,10 @@
 import os
 import json
-import asyncio
-import itertools
 import aiofiles
 from dateutil.parser import parse
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
+from exceptions import FrameNotFoundException
 
 def generate_30_min_intervals():
     intervals = []
@@ -101,7 +100,6 @@ def split_bookings_by_day(bookings):
     return days
 
 def add_missing_timeslots(booking_details, target_timeslot_array):
-    current_time = "00:00"
     complete_booking_details = []
     for timeslot in target_timeslot_array:
         found = False
@@ -119,310 +117,244 @@ def add_missing_timeslots(booking_details, target_timeslot_array):
             })
     return complete_booking_details
 
-# Scraping Function
+### SCRAPING METHODS ####
+async def login_credentials(page, constants, local_credentials):
+    await page.goto(constants['target_url'])
+    print(f"Navigating to {constants['target_url']}")
+
+    selectors = ['input#userNameInput', 'input#passwordInput', 'span#submitButton']
+    for selector in selectors:
+        await page.wait_for_selector(selector)
+
+    await page.fill("input#userNameInput", local_credentials.username)
+    await page.fill("input#passwordInput", local_credentials.password)
+    await page.click("span#submitButton")
+
+    await page.wait_for_timeout(6000)
+    await page.wait_for_load_state('networkidle')
+
+
+async def select_dropdown_options(frame, dropdown_selector, options, hide_popup_js="popup.hide()"):
+    if not options:
+        return
+
+    if await frame.is_visible(dropdown_selector):
+        await frame.click(dropdown_selector)  # Opens the dropdown list
+        for option in options:
+            await frame.click(f'text="{option}"')
+            print(f"Selecting {option}...")
+        await frame.evaluate(hide_popup_js)  # Closes the dropdown list
+        await frame.page.wait_for_load_state('networkidle')
+        await frame.wait_for_timeout(3000)
+
+
+async def apply_filters(frame, request):
+    HIDE_POPUP = "popup.hide()"
+    await select_dropdown_options(frame, '#DropMultiBuildingList_c1_textItem', request.building_names, HIDE_POPUP)
+    await select_dropdown_options(frame, '#DropMultiFloorList_c1_textItem', request.floors, HIDE_POPUP)
+    await select_dropdown_options(frame, '#DropMultiFacilityTypeList_c1_textItem', request.facility_types, HIDE_POPUP)
+    await select_dropdown_options(frame, '#DropMultiEquipmentList_c1_textItem', request.equipment, HIDE_POPUP)
+
+
+async def select_time(frame, time_selector, time_value, description):
+    select_input = await frame.query_selector(time_selector)
+    if select_input:
+        await frame.evaluate(f'document.querySelector("{time_selector}").value = "{time_value}"')
+        print(f"Selected {description} to be {time_value}")
+    else:
+        print(f"Select element for {description.lower()} not found")
+
+
+async def navigate_to_date(frame, target_date):
+    while True:
+        current_date_element = await frame.query_selector("input#DateBookingFrom_c1_textDate")
+        current_date_value = await current_date_element.get_attribute("value")
+        if current_date_value == target_date:
+            print(f"Final day is {current_date_value}")
+            break
+        else:
+            print(f"Current day is {current_date_value}")
+            print("Navigating to the next day...")
+            await frame.click("a#BtnDpcNext.btn")
+            await frame.wait_for_timeout(1500)
+
+
+async def extract_matching_rooms(frame):
+    await frame.wait_for_selector("table#GridResults_gv")
+    matching_rooms = []
+    rows = await frame.query_selector_all("table#GridResults_gv tbody tr")
+    for row in rows:
+        tds = await row.query_selector_all("td")
+        if len(tds) > 1:
+            room_text = (await tds[1].inner_text()).strip()
+            matching_rooms.append(room_text)
+    return matching_rooms
+
+async def scrape_timeslots(frame, valid_buildings):
+    room_names_raw = [await room.inner_text() for room in await frame.query_selector_all("div.scheduler_bluewhite_rowheader_inner")]
+    room_names = [name for name in room_names_raw if name not in valid_buildings]
+    
+    bookings_elements = await frame.query_selector_all("div.scheduler_bluewhite_event.scheduler_bluewhite_event_line0")
+    bookings_raw = [await elem.get_attribute("title") for elem in bookings_elements]
+    bookings_sanitised = split_bookings_by_day(bookings_raw)
+    
+    room_timeslot_map = {}
+    for index, booking_array in enumerate(bookings_sanitised):
+        booking_details = []
+        for booking in booking_array:
+            if booking.startswith("Booking Time:"):
+                details = {}
+                lines = booking.split("\n")
+                timeslot = lines[0].replace("Booking Time: ", "")
+                for line in lines[1:]:
+                    key, value = line.split(": ", 1)
+                    details[key] = value
+                booking_details.append({
+                    "timeslot": timeslot,
+                    "available": False,
+                    "status": "Booked",
+                    "details": details
+                })
+            elif booking.endswith("(not available)"):
+                time = booking.split(") (")[0].lstrip("(")
+                booking_details.append({
+                    "timeslot": time,
+                    "available": False,
+                    "status": "Not available",
+                    "details": None
+                })
+            else:
+                print(f"Unrecognised timeslot format, logged here: {booking}")
+
+        room_timeslot_map[room_names[index]] = fill_missing_timeslots(booking_details, generate_30_min_intervals())
+    
+    return room_timeslot_map
+
+
 async def scrape_smu_fbs(request, constants):
     """
     Asynchronously handle automated login to SMU FBS and scrape booked timeslots.
     Returns the final booking log.
     """
-    VALID_TIME = constants['valid_time']
-    VALID_ROOM_CAPACITY_FORMATTED = constants['valid_room_capacity']
-    VALID_BUILDING = constants['valid_buildings']
-    VALID_FLOOR = constants['valid_floors']
-    VALID_FACILITY_TYPE = constants['valid_facility_types']
-    VALID_EQUIPMENT = constants['valid_equipment']
-    
-    DATE_RAW = request.date_raw
-    DATE_FORMATTED = format_date(DATE_RAW) 
-    DURATION_HRS = request.duration_hours
-    START_TIME = request.start_time
-    END_TIME = calculate_end_time(VALID_TIME, START_TIME, DURATION_HRS)[0]
-    ROOM_CAPACITY_RAW = 7  # Assuming default, or modify as needed
-
-    # Define room capacity mapping
-    capacity_mapping = {
-        lambda x: x < 5: "LessThan5Pax",
-        lambda x: x <= 10: "From6To10Pax",
-        lambda x: x <= 15: "From11To15Pax",
-        lambda x: x <= 20: "From16To20Pax",
-        lambda x: x <= 50: "From21To50Pax",
-        lambda x: x <= 100: "From51To100Pax",
-    }
-    ROOM_CAPACITY_FORMATTED = await convert_room_capacity(ROOM_CAPACITY_RAW, capacity_mapping)
-    BUILDING_ARRAY = request.building_names
-    FLOOR_ARRAY = request.floors
-    FACILITY_TYPE_ARRAY = request.facility_types
-    EQUIPMENT_ARRAY = request.equipment
-    SCREENSHOT_FILEPATH = constants['screenshot_filepath']
-    BOOKING_LOG_FILEPATH = constants['booking_log_filepath']
-    
-    # Ensure directories exist
-    os.makedirs(SCREENSHOT_FILEPATH, exist_ok=True)
-    os.makedirs(BOOKING_LOG_FILEPATH, exist_ok=True)
-    
-    local_credentials = request.credentials
-    
     try:
+        DATE_FORMATTED = format_date(request.date_raw)
+        END_TIME = calculate_end_time(constants['valid_time'], request.start_time, request.duration_hours)[0]
+        ROOM_CAPACITY_FORMATTED = await convert_room_capacity(7, {
+            lambda x: x < 5: "LessThan5Pax",
+            lambda x: x <= 10: "From6To10Pax",
+            lambda x: x <= 15: "From11To15Pax",
+            lambda x: x <= 20: "From16To20Pax",
+            lambda x: x <= 50: "From21To50Pax",
+            lambda x: x <= 100: "From51To100Pax",
+        })
+        
+        # Ensure directories exist
+        os.makedirs(constants['screenshot_filepath'], exist_ok=True)
+        os.makedirs(constants['booking_log_filepath'], exist_ok=True)
+        
+        local_credentials = request.credentials
+        
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, slow_mo=1000)
-            # browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-
+            
             try:
-                # ---------- LOGIN CREDENTIALS ----------
-                await page.goto(constants['target_url'])
-
-                await page.wait_for_selector('input#userNameInput')
-                await page.wait_for_selector('input#passwordInput')
-                await page.wait_for_selector('span#submitButton')
-
-                print(f"Navigating to {constants['target_url']}")
-
-                await page.fill("input#userNameInput", local_credentials.username)
-                await page.fill("input#passwordInput", local_credentials.password)
-                await page.click("span#submitButton")
-
-                await page.wait_for_timeout(6000)
-                await page.wait_for_load_state('networkidle')
-
-                # ---------- NAVIGATE TO GIVEN DATE ----------
-                frame = page.frame(name="frameBottom") 
+                # Login
+                await login_credentials(page, constants, local_credentials)
+                
+                # Navigate to content frame
+                frame = page.frame(name="frameContent")
                 if not frame:
-                    raise Exception("Frame 'frameBottom' could not be found.")
-                else:
-                    frame = page.frame(name="frameContent")
-                    while True:
-                        current_date_element = await frame.query_selector("input#DateBookingFrom_c1_textDate")
-                        current_date_value = await current_date_element.get_attribute("value")
-                        if current_date_value == DATE_FORMATTED:
-                            print(f"Final day is {current_date_value}")
-                            break
-                        else:
-                            print(f"Current day is {current_date_value}")
-                            print("Navigating to the next day...")
-                            await frame.click("a#BtnDpcNext.btn")
-                            await frame.wait_for_timeout(1500)
-
-                    # ---------- EXTRACT PAGE DATA ----------
-
-
-                    # ----- SELECT START TIME -----
-                    select_start_time_input = await frame.query_selector("select#TimeFrom_c1_ctl04")
-                    if select_start_time_input:
-                        await frame.evaluate(f'document.querySelector("select#TimeFrom_c1_ctl04").value = "{START_TIME}"')
-                        print(f"Selected start time to be {START_TIME}")
-                    else:
-                        print("Select element for start time not found")
-
-                    # ----- SELECT END TIME -----
-                    select_end_time_input = await frame.query_selector_all("select#TimeTo_c1_ctl04")
-                    if select_end_time_input:
-                        await frame.evaluate(f'document.querySelector("select#TimeTo_c1_ctl04").value = "{END_TIME}"')
-                        print(f"Selected end time to be {END_TIME}")
-                    else:
-                        print("Select element for end time not found")
-
-                    await frame.wait_for_timeout(3000)
-
-                    # ----- APPLY FILTERS -----
-                    
-                    # ----- SELECT BUILDINGS -----
-                    if BUILDING_ARRAY:
-                        if await frame.is_visible('#DropMultiBuildingList_c1_textItem'):
-                            await frame.click('#DropMultiBuildingList_c1_textItem')  # Opens the dropdown list
-                            for building_name in BUILDING_ARRAY:
-                                await frame.click(f'text="{building_name}"')
-                                print(f"Selecting {building_name}...")
-                            await frame.evaluate("popup.hide()")  # Closes the dropdown list
-                            await page.wait_for_load_state('networkidle')
-                            await frame.wait_for_timeout(3000)
-
-                    # ----- SELECT FLOORS -----
-                    if FLOOR_ARRAY:
-                        if await frame.is_visible('#DropMultiFloorList_c1_textItem'):
-                            await frame.click('#DropMultiFloorList_c1_textItem')  # Opens the dropdown list
-                            for floor_name in FLOOR_ARRAY:
-                                await frame.click(f'text="{floor_name}"')
-                                print(f"Selecting {floor_name}...")
-                            await frame.evaluate("popup.hide()")  # Closes the dropdown list
-                            await page.wait_for_load_state('networkidle')
-                            await frame.wait_for_timeout(3000)
-
-                    # ----- SELECT FACILITY TYPE -----
-                    if FACILITY_TYPE_ARRAY:
-                        if await frame.is_visible('#DropMultiFacilityTypeList_c1_textItem'):
-                            await frame.click('#DropMultiFacilityTypeList_c1_textItem')  # Opens the dropdown list
-                            for facility_type_name in FACILITY_TYPE_ARRAY:
-                                await frame.click(f'text="{facility_type_name}"')
-                                print(f"Selecting {facility_type_name}...")
-                            await frame.evaluate("popup.hide()")  # Closes the dropdown list
-                            await page.wait_for_load_state('networkidle')
-                            await frame.wait_for_timeout(3000)
-
-                    # ----- SELECT ROOM CAPACITY -----
-                    select_capacity_input = await frame.query_selector("select#DropCapacity_c1")
-                    if select_capacity_input:
-                        await frame.evaluate(f'document.querySelector("select#DropCapacity_c1").value = "{ROOM_CAPACITY_FORMATTED}"')
-                        print(f"Selected room capacity to be {ROOM_CAPACITY_FORMATTED}")
-                    else:
-                        print("Select element for room capacity not found")
-
-                    await frame.wait_for_timeout(3000)
-
-
-                    # ----- SELECT EQUIPMENT -----
-                    if EQUIPMENT_ARRAY:
-                        if await frame.is_visible('#DropMultiEquipmentList_c1_textItem'):
-                            await frame.click('#DropMultiEquipmentList_c1_textItem')  # Opens the dropdown list
-                            for equipment_name in EQUIPMENT_ARRAY:
-                                await frame.click(f'text="{equipment_name}"')
-                                print(f"Selecting {equipment_name}...")
-                            await frame.evaluate("popup.hide()")  # Closes the dropdown list
-                            await page.wait_for_load_state('networkidle')
-                            await frame.wait_for_timeout(3000)
-
-                    await page.screenshot(path=os.path.join(SCREENSHOT_FILEPATH, "0.png"))
-
-                    # ----- ROOM EXTRACTION -----
-                    await frame.wait_for_selector("table#GridResults_gv")
-                    matching_rooms = []
-                    rows = await frame.query_selector_all("table#GridResults_gv tbody tr")
-                    for row in rows:
-                        tds = await row.query_selector_all("td")
-                        if len(tds) > 1: 
-                            room_text = (await tds[1].inner_text()).strip()
-                            matching_rooms.append(room_text)
-                    if not matching_rooms:
-                        print("No rooms fitting description found.")
-                        print("Closing browser...")
-                        await browser.close() 
-
-                        current_datetime = datetime.now()
-                        formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-                        final_booking_log = {
-                            "metrics": {
-                                "scraping_date": formatted_datetime,
-                            },
-                            "scraped": {
-                                "config": {
-                                    "date": DATE_FORMATTED,
-                                    "start_time": START_TIME,
-                                    "end_time": END_TIME,
-                                    "duration": DURATION_HRS,
-                                    "building_names": BUILDING_ARRAY,
-                                    "floors": FLOOR_ARRAY,
-                                    "facility_types": FACILITY_TYPE_ARRAY,
-                                    "room_capacity": ROOM_CAPACITY_FORMATTED,
-                                    "equipment": EQUIPMENT_ARRAY
-                                },
-                                "result": {}
-                            }
-                        }
-                        
-                        await write_json(final_booking_log, os.path.join(BOOKING_LOG_FILEPATH, "scraped_log.json"))
-
-                        return final_booking_log
-
-                    else:
-                        print(f"{len(matching_rooms)} rooms fitting description found:")
-                        for room in matching_rooms:
-                            print(f"- {room}")
-
-                        # ----- SEARCH AVAILABILITY -----
-                        await frame.click("a#CheckAvailability")
-                        print("Submitting search availability request...")
-                        await page.wait_for_load_state("networkidle")
-                        await page.wait_for_timeout(6000)
-
-                        # ---------- VIEW TIMESLOTS ----------
-
-                            # ----- CAPTURE SCREENSHOT OF TIMESLOTS -----
-                        await page.screenshot(path=os.path.join(SCREENSHOT_FILEPATH, "1.png"))
-
-
-                            # ----- SCRAPE TIMESLOTS -----
-                        frame = page.frame(name="frameBottom")
-                        frame = page.frame(name="frameContent")
-                        room_names_array_raw = [await room.inner_text() for room in await frame.query_selector_all("div.scheduler_bluewhite_rowheader_inner")]
-                        room_names_array_sanitised = [el for el in room_names_array_raw if el not in VALID_BUILDING]
-                        bookings_elements = await frame.query_selector_all("div.scheduler_bluewhite_event.scheduler_bluewhite_event_line0")
-                        bookings_array_raw = [await active_booking.get_attribute("title") for active_booking in bookings_elements]
-                        bookings_array_sanitised = split_bookings_by_day(bookings_array_raw)
-                        
-                        room_timeslot_map = {}
-
-                        for index, booking_array in enumerate(bookings_array_sanitised):
-                            booking_details = []
-
-                            for booking in booking_array:
-                                if booking.startswith("Booking Time:"):  # Existing booking
-                                    room_details = {}
-                                    for el in booking.split("\n"):
-                                        if el.startswith("Booking Time:"):
-                                            local_timeslot = el.lstrip("Booking Time: ")
-                                        else:
-                                            key, value = el.split(": ", 1)
-                                            room_details[key] = value
-                                    active_booking_details = {
-                                        "timeslot": local_timeslot,
-                                        "available": False,
-                                        "status": "Booked",
-                                        "details": room_details
-                                    }
-                                    booking_details.append(active_booking_details)
-
-                                elif booking.endswith("(not available)"):  # Not available booking
-                                    time = booking.split(") (")[0]
-                                    na_booking_details = {
-                                        "timeslot": time.lstrip("("),
-                                        "available": False,
-                                        "status": "Not available",
-                                        "details": None
-                                    }
-                                    booking_details.append(na_booking_details)
-
-                                else: 
-                                    # Edge case checking
-                                    print(f"Unrecognised timeslot format, logged here: {booking}")
-
-                            room_timeslot_map[room_names_array_sanitised[index]] = fill_missing_timeslots(booking_details, generate_30_min_intervals())
-
-                        current_datetime = datetime.now()
-                        formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-
-                        final_booking_log = {
-                            "metrics": {
-                                "scraping_date": formatted_datetime,
-                            },
-                            "scraped": {
-                                "config": {
-                                    "date": DATE_FORMATTED,
-                                    "start_time": START_TIME,
-                                    "end_time": END_TIME,
-                                    "duration": DURATION_HRS,
-                                    "building_names": BUILDING_ARRAY,
-                                    "floors": FLOOR_ARRAY,
-                                    "facility_types": FACILITY_TYPE_ARRAY,
-                                    "room_capacity": ROOM_CAPACITY_FORMATTED,
-                                    "equipment": EQUIPMENT_ARRAY
-                                },
-                                "result": room_timeslot_map
-                            }
-                        }
-                        
-                        await write_json(final_booking_log, os.path.join(BOOKING_LOG_FILEPATH, "scraped_log.json"))
-                        return final_booking_log
-
+                    raise FrameNotFoundException("Frame 'frameContent' could not be found.")
+                
+                # Navigate to the desired date
+                await navigate_to_date(frame, DATE_FORMATTED)
+                
+                # Select start and end times
+                await select_time(frame, "select#TimeFrom_c1_ctl04", request.start_time, "start time")
+                await select_time(frame, "select#TimeTo_c1_ctl04", END_TIME, "end time")
+                await frame.wait_for_timeout(3000)
+                
+                # Apply filters
+                await apply_filters(frame, request)
+                
+                # Select room capacity
+                await select_time(frame, "select#DropCapacity_c1", ROOM_CAPACITY_FORMATTED, "room capacity")
+                await frame.wait_for_timeout(3000)
+                
+                # Take initial screenshot
+                await page.screenshot(path=os.path.join(constants['screenshot_filepath'], "0.png"))
+                
+                # Extract matching rooms
+                matching_rooms = await extract_matching_rooms(frame)
+                if not matching_rooms:
+                    print("No rooms fitting description found.")
+                    return await generate_final_log(constants, DATE_FORMATTED, request, {})
+                
+                print(f"{len(matching_rooms)} rooms fitting description found:")
+                for room in matching_rooms:
+                    print(f"- {room}")
+                
+                # Search availability
+                await frame.click("a#CheckAvailability")
+                print("Submitting search availability request...")
+                await page.wait_for_load_state("networkidle")
+                await page.wait_for_timeout(6000)
+                
+                # Capture screenshot of timeslots
+                await page.screenshot(path=os.path.join(constants['screenshot_filepath'], "1.png"))
+                
+                # Scrape timeslots
+                final_timeslot_map = await scrape_timeslots(frame, constants['valid_buildings'])
+                
+                # Generate and write final booking log
+                return await generate_final_log(constants, DATE_FORMATTED, request, final_timeslot_map)
+            
+            except FrameNotFoundException as fnf_error:
+                print(f"Frame not found error: {fnf_error}")
+                raise fnf_error
+            
             except Exception as e:
                 print(f"Error processing {constants['target_url']}: {e}")
-                raise e  # Propagate exception to be handled by FastAPI
-
+                raise e
+            
             finally:
                 print("Closing browser...")
-                await browser.close() 
-
+                await browser.close()
+    
     except Exception as e:
         print(f"Failed to initialize Playwright: {e}")
-        raise e  # Propagate exception to be handled by FastAPI
+        raise e
+
+
+async def generate_final_log(constants, date_formatted, request, result):
+    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    final_booking_log = {
+        "metrics": {
+            "scraping_date": current_datetime,
+        },
+        "scraped": {
+            "config": {
+                "date": date_formatted,
+                "start_time": request.start_time,
+                "end_time": calculate_end_time(constants['valid_time'], request.start_time, request.duration_hours)[0],
+                "duration": request.duration_hours,
+                "building_names": request.building_names,
+                "floors": request.floors,
+                "facility_types": request.facility_types,
+                "room_capacity": await convert_room_capacity(7, {
+                    lambda x: x < 5: "LessThan5Pax",
+                    lambda x: x <= 10: "From6To10Pax",
+                    lambda x: x <= 15: "From11To15Pax",
+                    lambda x: x <= 20: "From16To20Pax",
+                    lambda x: x <= 50: "From21To50Pax",
+                    lambda x: x <= 100: "From51To100Pax",
+                }),
+                "equipment": request.equipment
+            },
+            "result": result
+        }
+    }
+    await write_json(final_booking_log, os.path.join(constants['booking_log_filepath'], "scraped_log.json"))
+    return final_booking_log
+
