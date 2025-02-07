@@ -102,11 +102,10 @@ def write_json(json_object, filename):
         print(f"json file written to filepath: {filename}")
 
 
-def read_credentials_json(credentials_filepath):
+def read_credentials(credentials_filepath):
     """
     read locally stored
-    credentials json file, 
-    now deprecated
+    credentials json file
     """
     try:
         with open(credentials_filepath, "r") as file:
@@ -393,10 +392,10 @@ def scrape_smu_fbs(base_url, credentials_filepath):
         "Wireless Projection",
     ]
 
-    DATE_RAW = "23 december 2024"
+    DATE_RAW = "1 november 2024"
     DATE_FORMATTED = format_date(DATE_RAW)
     DURATION_HRS = 2.5
-    START_TIME = "14:00"
+    START_TIME = "11:00"
     END_TIME = calculate_end_time(VALID_TIME, START_TIME, DURATION_HRS)[0]
     ROOM_CAPACITY_RAW = 7
     ROOM_CAPACITY_FORMATTED = convert_room_capacity(ROOM_CAPACITY_RAW)
@@ -411,7 +410,9 @@ def scrape_smu_fbs(base_url, credentials_filepath):
     BOOKING_LOG_FILEPATH = "./booking_log/"
 
     errors = []
-    local_credentials = read_credentials()
+    local_credentials = read_credentials(credentials_filepath)
+    # print(local_credentials["username"])
+    # print(local_credentials["password"])
 
     try:
 
